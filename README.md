@@ -1,4 +1,4 @@
-# Markdown
+# md-viewer
 
 A minimal, fast, native-feeling markdown editor/viewer for macOS. Tauri 2 + CodeMirror 6.
 
