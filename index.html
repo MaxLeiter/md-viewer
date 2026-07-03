@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Markdown</title>
+    <style>
+      html {
+        background: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        html {
+          background: #1e1e20;
+        }
+      }
+      #boot-error {
+        position: fixed;
+        inset: auto 12px 12px 12px;
+        z-index: 9999;
+        padding: 12px 14px;
+        font: 12px/1.5 ui-monospace, Menlo, monospace;
+        color: #fff;
+        background: #b3261e;
+        border-radius: 10px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+    <script>
+      // Startup crashes in release builds (no devtools) would otherwise be a
+      // silent white screen: paint the error and forward it to the backend log.
+      (function () {
+        function report(message) {
+          try {
+            var el = document.getElementById("boot-error");
+            if (!el) {
+              el = document.createElement("div");
+              el.id = "boot-error";
+              document.body.appendChild(el);
+            }
+            el.textContent = message;
+          } catch (_) {}
+          try {
+            window.__TAURI_INTERNALS__.invoke("log_error", { message: String(message) });
+          } catch (_) {}
+        }
+        window.addEventListener("error", function (e) {
+          report((e.error && e.error.stack) || e.message || "unknown error");
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          var r = e.reason;
+          report("unhandled rejection: " + ((r && (r.stack || r.message)) || String(r)));
+        });
+      })();
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

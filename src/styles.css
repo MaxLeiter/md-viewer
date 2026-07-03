@@ -1,0 +1,1602 @@
+/* ---------------------------------------------------------------------------
+   Design tokens
+--------------------------------------------------------------------------- */
+
+:root {
+  --font-prose: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --titlebar-h: 38px;
+
+  --bg: #ffffff;
+  --bg-secondary: #f5f5f6;
+  --bg-elevated: #ffffff;
+  --fg: #1d1d1f;
+  --fg-muted: #73737a;
+  --fg-faint: #b3b3ba;
+  --accent: #3478f6;
+  --accent-soft: rgba(52, 120, 246, 0.1);
+  --border: rgba(0, 0, 0, 0.09);
+  --code-bg: rgba(0, 0, 0, 0.045);
+  --selection: rgba(52, 120, 246, 0.22);
+  --search-match: rgba(255, 200, 0, 0.35);
+  --search-match-selected: rgba(255, 150, 0, 0.5);
+
+  /* Syntax (Xcode-ish, light) */
+  --syn-keyword: #9b2393;
+  --syn-string: #c41a16;
+  --syn-comment: #707f8c;
+  --syn-number: #1c00cf;
+  --syn-func: #326d74;
+  --syn-type: #3900a0;
+  --syn-prop: #6c36a9;
+}
+
+:root[data-theme="dark"] {
+  --bg: #1e1e20;
+  --bg-secondary: #29292c;
+  --bg-elevated: #38383c;
+  --fg: #e8e8ea;
+  --fg-muted: #98989f;
+  --fg-faint: #5c5c64;
+  --accent: #6f9eff;
+  --accent-soft: rgba(111, 158, 255, 0.14);
+  --border: rgba(255, 255, 255, 0.09);
+  --code-bg: rgba(255, 255, 255, 0.06);
+  --selection: rgba(111, 158, 255, 0.3);
+  --search-match: rgba(255, 200, 0, 0.25);
+  --search-match-selected: rgba(255, 160, 0, 0.45);
+  --syn-keyword: #fc5fa3;
+  --syn-string: #fc6a5d;
+  --syn-comment: #6c7986;
+  --syn-number: #d0bf69;
+  --syn-func: #67b7a4;
+  --syn-type: #5dd8ff;
+  --syn-prop: #a167e6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1e1e20;
+    --bg-secondary: #29292c;
+    --bg-elevated: #38383c;
+    --fg: #e8e8ea;
+    --fg-muted: #98989f;
+    --fg-faint: #5c5c64;
+    --accent: #6f9eff;
+    --accent-soft: rgba(111, 158, 255, 0.14);
+    --border: rgba(255, 255, 255, 0.09);
+    --code-bg: rgba(255, 255, 255, 0.06);
+    --selection: rgba(111, 158, 255, 0.3);
+    --search-match: rgba(255, 200, 0, 0.25);
+    --search-match-selected: rgba(255, 160, 0, 0.45);
+
+    /* Syntax (Xcode-ish, dark) */
+    --syn-keyword: #fc5fa3;
+    --syn-string: #fc6a5d;
+    --syn-comment: #6c7986;
+    --syn-number: #d0bf69;
+    --syn-func: #67b7a4;
+    --syn-type: #5dd8ff;
+    --syn-prop: #a167e6;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+--------------------------------------------------------------------------- */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-prose);
+  background: var(--bg);
+  color: var(--fg);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+button {
+  font-family: inherit;
+}
+
+body.resizing-x,
+body.resizing-x * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.resizing-y,
+body.resizing-y * {
+  cursor: row-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------------------------------------------------------------------------
+   Title bar (overlay traffic lights on the left)
+--------------------------------------------------------------------------- */
+
+.titlebar {
+  height: var(--titlebar-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 10px 0 84px;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.titlebar-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 45%;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-muted);
+  pointer-events: none;
+}
+
+.titlebar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dirty-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+}
+
+.titlebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.titlebar-btn {
+  all: unset;
+  width: 30px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--fg-muted);
+}
+
+.titlebar-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--fg);
+}
+
+.titlebar-btn.active {
+  background: var(--bg-secondary);
+  color: var(--fg);
+}
+
+.mode-switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--bg-secondary);
+}
+
+.mode-switch button {
+  all: unset;
+  width: 32px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--fg-muted);
+}
+
+.mode-switch button:hover {
+  color: var(--fg);
+}
+
+.mode-switch button.active {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  box-shadow:
+    0 0 0 0.5px var(--border),
+    0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* ---------------------------------------------------------------------------
+   Workspace: tile tree
+--------------------------------------------------------------------------- */
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.tile-slot {
+  position: absolute;
+  overflow: hidden;
+  animation: tile-in 190ms cubic-bezier(0.25, 0.6, 0.3, 1);
+}
+
+@keyframes tile-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+
+body:not(.resizing-x):not(.resizing-y) .tile-slot,
+body:not(.resizing-x):not(.resizing-y) .divider {
+  transition:
+    left 190ms cubic-bezier(0.25, 0.6, 0.3, 1),
+    top 190ms cubic-bezier(0.25, 0.6, 0.3, 1),
+    width 190ms cubic-bezier(0.25, 0.6, 0.3, 1),
+    height 190ms cubic-bezier(0.25, 0.6, 0.3, 1),
+    opacity 150ms ease-out;
+}
+
+.tile-slot.closing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.divider {
+  position: absolute;
+  z-index: 6;
+  background: var(--border);
+}
+
+.divider-row {
+  cursor: col-resize;
+}
+
+.divider-row::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+  cursor: col-resize;
+}
+
+.divider-col {
+  cursor: row-resize;
+}
+
+.divider-col::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -4px;
+  cursor: row-resize;
+}
+
+/* ---------------------------------------------------------------------------
+   Tile (one document)
+--------------------------------------------------------------------------- */
+
+.tile {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.tile-header {
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--fg-faint);
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+body.tile-dragging,
+body.tile-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.tile-slot.drag-source {
+  opacity: 0.75;
+}
+
+.tile-drop-indicator {
+  position: absolute;
+  z-index: 60;
+  background: var(--accent-soft);
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  pointer-events: none;
+  transition:
+    left 90ms ease-out,
+    top 90ms ease-out,
+    width 90ms ease-out,
+    height 90ms ease-out;
+}
+
+.tile.focused .tile-header {
+  background: var(--bg);
+}
+
+.tile-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+
+.tile.focused .tile-title {
+  color: var(--fg);
+}
+
+.tile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-header .dirty-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.remote-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
+}
+
+.tile-close {
+  all: unset;
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--fg-faint);
+}
+
+.tile-close:hover {
+  background: var(--code-bg);
+  color: var(--fg);
+}
+
+.tile-body {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Document outline sidebar */
+.outline {
+  flex: none;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.outline-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 6px 14px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.outline-close {
+  all: unset;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--fg-faint);
+}
+
+.outline-close:hover {
+  background: var(--code-bg);
+  color: var(--fg);
+}
+
+.outline-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 10px;
+}
+
+.outline-item {
+  all: unset;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 12px 3px 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--fg-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.outline-item:hover {
+  background: var(--code-bg);
+  color: var(--fg);
+}
+
+.outline-empty {
+  margin: 8px 14px;
+  font-size: 12px;
+  color: var(--fg-faint);
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body:not(.resizing-x):not(.resizing-y) .pane {
+  transition:
+    flex-grow 180ms cubic-bezier(0.25, 0.6, 0.3, 1),
+    opacity 140ms ease-out;
+}
+
+.pane-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pane > * {
+  flex: 1;
+  min-height: 0;
+}
+
+.pane-divider {
+  flex: none;
+  width: 1px;
+  position: relative;
+  z-index: 6;
+  background: var(--border);
+  cursor: col-resize;
+}
+
+.pane-divider::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+  cursor: col-resize;
+}
+
+/* ---------------------------------------------------------------------------
+   Editor (CodeMirror)
+--------------------------------------------------------------------------- */
+
+.editor {
+  height: 100%;
+}
+
+.editor .cm-editor {
+  height: 100%;
+}
+
+/* Word-style smooth caret: a quick glide between positions (kept short so it
+   never feels like it's lagging behind the keystroke). */
+.editor .cm-cursor {
+  transition:
+    left 50ms cubic-bezier(0.2, 0.8, 0.4, 1),
+    top 50ms cubic-bezier(0.2, 0.8, 0.4, 1);
+}
+
+html.no-caret-animation .editor .cm-cursor {
+  transition: none;
+}
+
+/* Frontmatter block in the editor: quiet mono metadata, never heading-sized. */
+.editor .cm-line.cm-frontmatter {
+  font-family: var(--font-mono);
+  color: var(--fg-muted);
+}
+
+.editor .cm-line.cm-frontmatter,
+.editor .cm-line.cm-frontmatter span {
+  font-size: calc(13px * var(--content-scale, 1)) !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+}
+
+.editor .cm-cursorLayer {
+  animation-timing-function: ease-in-out !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Preview
+--------------------------------------------------------------------------- */
+
+.preview {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.preview-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--fg-faint);
+  font-size: 14px;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+
+.preview-content {
+  max-width: var(--content-width, 44rem);
+  margin: 0 auto;
+  padding: 28px 32px 96px;
+  font-size: calc(15px * var(--content-scale, 1));
+  line-height: 1.65;
+  word-wrap: break-word;
+}
+
+/* Frontmatter properties card */
+.preview-content .frontmatter {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 18px;
+  margin: 0 0 1.5em;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.88em;
+}
+
+.preview-content .frontmatter-row {
+  display: contents;
+}
+
+.preview-content .frontmatter-key {
+  color: var(--fg-muted);
+  font-weight: 500;
+}
+
+.preview-content .frontmatter-value {
+  overflow-wrap: anywhere;
+}
+
+.preview-content .frontmatter pre {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0;
+  background: none;
+  font-size: 0.95em;
+}
+
+/* GitHub-style alerts (> [!NOTE] …) */
+.preview-content .markdown-alert {
+  margin: 0.9em 0;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--fg-faint);
+  color: var(--fg);
+}
+
+.preview-content .markdown-alert > :last-child {
+  margin-bottom: 0;
+}
+
+.preview-content .markdown-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0.2em 0 0.4em;
+  font-weight: 600;
+  font-size: 0.95em;
+}
+
+.preview-content .markdown-alert-title svg {
+  fill: currentColor;
+}
+
+.preview-content .markdown-alert-note {
+  border-color: #4493f8;
+}
+.preview-content .markdown-alert-note .markdown-alert-title {
+  color: #4493f8;
+}
+.preview-content .markdown-alert-tip {
+  border-color: #3fb950;
+}
+.preview-content .markdown-alert-tip .markdown-alert-title {
+  color: #3fb950;
+}
+.preview-content .markdown-alert-important {
+  border-color: #ab7df8;
+}
+.preview-content .markdown-alert-important .markdown-alert-title {
+  color: #ab7df8;
+}
+.preview-content .markdown-alert-warning {
+  border-color: #d29922;
+}
+.preview-content .markdown-alert-warning .markdown-alert-title {
+  color: #d29922;
+}
+.preview-content .markdown-alert-caution {
+  border-color: #f85149;
+}
+.preview-content .markdown-alert-caution .markdown-alert-title {
+  color: #f85149;
+}
+
+/* Footnotes */
+.preview-content .footnotes {
+  margin-top: 2.5em;
+  font-size: 0.88em;
+  color: var(--fg-muted);
+}
+
+.preview-content .footnotes-sep {
+  margin: 2em 0 1em;
+}
+
+.preview-content .footnote-backref {
+  text-decoration: none;
+  margin-left: 4px;
+}
+
+.preview-content sup.footnote-ref a {
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.preview-content > :first-child {
+  margin-top: 0;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3,
+.preview-content h4,
+.preview-content h5,
+.preview-content h6 {
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  margin: 1.4em 0 0.5em;
+}
+
+.preview-content h1 {
+  font-size: 1.85em;
+  letter-spacing: -0.02em;
+}
+
+.preview-content h2 {
+  font-size: 1.45em;
+}
+
+.preview-content h3 {
+  font-size: 1.2em;
+}
+
+.preview-content h4 {
+  font-size: 1.05em;
+}
+
+.preview-content h5,
+.preview-content h6 {
+  font-size: 1em;
+}
+
+.preview-content h6 {
+  color: var(--fg-muted);
+}
+
+/* A paragraph break is a blank source line in the editor, which occupies one
+   full line box (line-height 1.65). Match that here so the preview keeps the
+   same vertical rhythm as the editor and the two panes stay aligned. */
+.preview-content p {
+  margin: 1.65em 0;
+}
+
+.preview-content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.preview-content a:hover {
+  text-decoration: underline;
+}
+
+.preview-content code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--code-bg);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+
+.preview-content pre {
+  background: var(--code-bg);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 0.9em 0;
+}
+
+.preview-content pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85em;
+  line-height: 1.55;
+}
+
+.preview-content blockquote {
+  margin: 0.8em 0;
+  padding: 0.1em 0 0.1em 1em;
+  border-left: 3px solid var(--fg-faint);
+  color: var(--fg-muted);
+}
+
+.preview-content ul,
+.preview-content ol {
+  margin: 1.65em 0;
+  padding-left: 1.5em;
+}
+
+/* List items are contiguous source lines in the editor (no blank line between
+   them), so they get no extra vertical gap here either. */
+.preview-content li {
+  margin: 0;
+}
+
+.preview-content li::marker {
+  color: var(--fg-muted);
+}
+
+.preview-content ul.contains-task-list {
+  padding-left: 0.4em;
+  list-style: none;
+}
+
+.preview-content .task-list-item input[type="checkbox"] {
+  margin-right: 0.5em;
+  accent-color: var(--accent);
+  vertical-align: -0.1em;
+}
+
+.preview-content table {
+  /* GitHub-style: size to content, never wider than the pane, scroll inside
+     itself when the content is genuinely wider. */
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.95em;
+}
+
+.preview-content th,
+.preview-content td {
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.preview-content th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.preview-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2em 0;
+}
+
+/* CSV / TSV table view */
+.preview-content .csv-meta {
+  margin: 0 0 0.8em;
+  font-size: 0.85em;
+  color: var(--fg-muted);
+}
+
+.preview-content table.csv-table {
+  font-size: 0.88em;
+}
+
+.preview-content table.csv-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-secondary);
+  white-space: nowrap;
+}
+
+.preview-content table.csv-table td {
+  vertical-align: top;
+  /* Long single-string values wrap instead of forcing an enormous column. */
+  max-width: 32em;
+  overflow-wrap: anywhere;
+}
+
+.preview-content img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+/* Inline HTML niceties (GitHub-style) */
+.preview-content kbd {
+  display: inline-block;
+  padding: 0.1em 0.45em;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  line-height: 1.4;
+  color: var(--fg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
+.preview-content details {
+  margin: 0.65em 0;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.preview-content details > summary {
+  cursor: default;
+  font-weight: 500;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.preview-content details[open] > summary {
+  margin-bottom: 0.4em;
+}
+
+.preview-content mark {
+  background: var(--search-match);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 0.15em;
+}
+
+.preview-content sub,
+.preview-content sup {
+  font-size: 0.75em;
+}
+
+/* shiki → dual-themed (github-light / github-dark) via CSS variables.
+   shiki emits each token's color as `--shiki-light` and `--shiki-dark` inline
+   custom properties; we pick the right one based on the active theme. The
+   block background stays --code-bg so it blends with the rest of the preview. */
+.preview-content pre.shiki {
+  background: var(--code-bg);
+}
+
+.preview-content .shiki,
+.preview-content .shiki span {
+  color: var(--shiki-light);
+}
+
+:root[data-theme="dark"] .preview-content .shiki,
+:root[data-theme="dark"] .preview-content .shiki span {
+  color: var(--shiki-dark);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .preview-content .shiki,
+  :root:not([data-theme="light"]) .preview-content .shiki span {
+    color: var(--shiki-dark);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Drop overlay
+--------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+   Tooltips (instant, styled, show keybinds)
+--------------------------------------------------------------------------- */
+
+[data-tip] {
+  position: relative;
+}
+
+[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  color: var(--fg);
+  font-size: 11.5px;
+  font-weight: 400;
+  font-style: normal;
+  text-decoration: none;
+  font-family: var(--font-prose);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  animation: tip-in 120ms ease-out 350ms forwards;
+}
+
+@keyframes tip-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Image lightbox
+--------------------------------------------------------------------------- */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.78);
+  cursor: zoom-out;
+  animation: fade-in 150ms ease-out;
+}
+
+.lightbox img {
+  max-width: 92vw;
+  max-height: 92vh;
+  border-radius: 8px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Settings panel
+--------------------------------------------------------------------------- */
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  animation: fade-in 140ms ease-out;
+}
+
+.settings-panel {
+  width: min(560px, calc(100vw - 48px));
+  max-height: min(680px, calc(100vh - 80px));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  animation: pop-in 150ms ease-out;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 10px;
+}
+
+.settings-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-close {
+  all: unset;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 16px;
+  color: var(--fg-muted);
+}
+
+.settings-close:hover {
+  background: var(--code-bg);
+  color: var(--fg);
+}
+
+.settings-body {
+  overflow-y: auto;
+  padding: 0 18px 18px;
+}
+
+.settings-body section {
+  margin-bottom: 18px;
+}
+
+.settings-body h3 {
+  margin: 14px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-text-btn {
+  all: unset;
+  font-size: 12px;
+  color: var(--accent);
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+.settings-text-btn:hover {
+  background: var(--accent-soft);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.settings-segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--bg-secondary);
+}
+
+.settings-segmented button {
+  all: unset;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.settings-segmented button:hover {
+  color: var(--fg);
+}
+
+.settings-segmented button.active {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  box-shadow:
+    0 0 0 0.5px var(--border),
+    0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.settings-keybind-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.settings-keybind-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-keybind-chip {
+  all: unset;
+  min-width: 72px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 12.5px;
+  background: var(--bg-secondary);
+  color: var(--fg);
+  border: 1px solid transparent;
+}
+
+.settings-keybind-chip:hover {
+  border-color: var(--border);
+}
+
+.settings-keybind-chip.recording {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.settings-keybind-chip.customized {
+  color: var(--accent);
+}
+
+.settings-keybind-reset {
+  all: unset;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--fg-faint);
+  font-size: 13px;
+}
+
+.settings-keybind-reset:not(:disabled):hover {
+  background: var(--code-bg);
+  color: var(--fg);
+}
+
+.settings-keybind-reset:disabled {
+  opacity: 0.35;
+}
+
+.settings-input {
+  width: 220px;
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--fg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-note {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+
+.settings-note code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--code-bg);
+  padding: 0.05em 0.3em;
+  border-radius: 3px;
+}
+
+/* "Open Remote…" prompt */
+.remote-prompt {
+  width: min(440px, calc(100vw - 48px));
+  padding: 18px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  animation: pop-in 150ms ease-out;
+}
+
+.remote-prompt-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.remote-prompt-input {
+  width: 100%;
+  padding: 8px 11px;
+  font: inherit;
+  font-size: 14px;
+  font-family: var(--font-mono);
+  color: var(--fg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.remote-prompt-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.remote-prompt-hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+
+.remote-prompt-hint code {
+  font-family: var(--font-mono);
+  background: var(--code-bg);
+  padding: 0.05em 0.3em;
+  border-radius: 3px;
+}
+
+.remote-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.remote-prompt-cancel,
+.remote-prompt-open {
+  all: unset;
+  padding: 5px 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: default;
+}
+
+.remote-prompt-cancel {
+  color: var(--fg-muted);
+}
+
+.remote-prompt-cancel:hover {
+  background: var(--code-bg);
+  color: var(--fg);
+}
+
+.remote-prompt-open {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+.remote-prompt-open:disabled {
+  opacity: 0.4;
+}
+
+/* ---------------------------------------------------------------------------
+   Annotations (preview highlights + comments)
+--------------------------------------------------------------------------- */
+
+.preview-content span.annotation {
+  border-radius: 2px;
+  cursor: pointer;
+  transition: filter 100ms ease;
+}
+
+.preview-content span.annotation:hover {
+  filter: brightness(1.1);
+}
+
+.preview-content span.annotation.has-note {
+  border-bottom: 2px solid var(--accent);
+}
+
+.annotate-bar {
+  position: fixed;
+  z-index: 320;
+  /* Vertical placement (and viewport clamping/flip) is resolved in JS; only
+     center horizontally on the anchor here. */
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.22);
+  animation: pop-in 110ms ease-out;
+}
+
+.annotate-swatch {
+  all: unset;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.annotate-swatch.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.annotate-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+.annotate-comment {
+  all: unset;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.annotate-comment:hover {
+  background: var(--code-bg);
+  color: var(--fg);
+}
+
+.annotate-popover {
+  position: fixed;
+  z-index: 320;
+  width: 240px;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  animation: pop-in 110ms ease-out;
+}
+
+.annotate-note {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--fg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-sizing: border-box;
+}
+
+.annotate-note:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.annotate-popover-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.annotate-colors {
+  display: flex;
+  gap: 5px;
+}
+
+.annotate-delete {
+  all: unset;
+  font-size: 12px;
+  color: #f85149;
+  padding: 2px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.annotate-delete:hover {
+  background: rgba(248, 81, 73, 0.12);
+}
+
+/* ---------------------------------------------------------------------------
+   Drop overlay
+--------------------------------------------------------------------------- */
+
+.drop-overlay {
+  position: fixed;
+  inset: 8px;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Selection formatting bar (CodeMirror tooltip)
+--------------------------------------------------------------------------- */
+
+.cm-tooltip.cm-format-bar {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.16);
+  animation: pop-in 120ms ease-out;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.cm-format-btn {
+  all: unset;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 12.5px;
+  color: var(--fg-muted);
+}
+
+.cm-format-btn:hover {
+  background: var(--code-bg);
+  color: var(--fg);
+}
+
+.cm-format-btn.fmt-bold {
+  font-weight: 700;
+}
+
+.cm-format-btn.fmt-italic {
+  font-style: italic;
+}
+
+.cm-format-btn.fmt-strike {
+  text-decoration: line-through;
+}
+
+.cm-format-btn.fmt-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------------------------
+   Table picker (GitHub-style grid)
+--------------------------------------------------------------------------- */
+
+.table-button {
+  position: relative;
+  display: flex;
+}
+
+.table-picker {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  z-index: 200;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.2);
+  animation: pop-in 130ms ease-out;
+}
+
+.table-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 16px);
+  grid-auto-rows: 16px;
+  gap: 3px;
+}
+
+.table-cell {
+  all: unset;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.table-cell.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.table-picker-label {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}

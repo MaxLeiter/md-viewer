@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# mdv — launch the Markdown viewer, building it from source on first use.
+#
+# Runs the compiler-produced release binary directly (not the .app bundle), so
+# it works on machines where binary-authorization (e.g. Santa) blocks unsigned
+# app bundles but allows locally compiled binaries.
+#
+# Usage:
+#   mdv                         open an empty document
+#   mdv file.md [more.md …]     open local files
+#   mdv host:/path/to/file.md   open a file over SSH
+#   mdv :/path/to/file.md       open over SSH using the configured default host
+#   mdv 'mdviewer://open?host=H&path=/p'   open a deep link
+#   mdv --rebuild [args…]       force a rebuild, then run
+#
+# Auto-detects its own checkout by resolving this script's location (following
+# the symlink you put on PATH), so it works from any clone path — override
+# with MDV_DIR if you keep the source somewhere the script can't find on its own.
+set -euo pipefail
+
+# Resolve $BASH_SOURCE to its real, symlink-free path (macOS bash has no `realpath`/`readlink -f`).
+resolve_script_path() {
+  local src="${BASH_SOURCE[0]}"
+  while [[ -L "$src" ]]; do
+    local dir
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  echo "$src"
+}
+
+find_app_dir() {
+  if [[ -n "${MDV_DIR:-}" ]]; then
+    echo "$MDV_DIR"
+    return
+  fi
+  # This script lives at <app>/scripts/mdv, so its grandparent is <app>.
+  local self_app_dir
+  self_app_dir="$(cd -P "$(dirname "$(resolve_script_path)")/.." && pwd)"
+  if [[ -f "$self_app_dir/src-tauri/Cargo.toml" ]]; then
+    echo "$self_app_dir"
+    return
+  fi
+  return 1
+}
+
+APP_DIR="$(find_app_dir)" || {
+  echo "mdv: could not find the Markdown source. Set MDV_DIR to its directory." >&2
+  exit 1
+}
+BIN="$APP_DIR/src-tauri/target/release/md-viewer"
+
+rebuild=0
+if [[ "${1:-}" == "--rebuild" || "${1:-}" == "--build" ]]; then
+  rebuild=1
+  shift
+fi
+
+if [[ "$rebuild" == 1 || ! -x "$BIN" ]]; then
+  echo "mdv: building Markdown from source ($APP_DIR)…" >&2
+  command -v bun  >/dev/null || { echo "mdv: 'bun' is required to build." >&2; exit 1; }
+  command -v cargo >/dev/null || { echo "mdv: 'cargo' is required to build." >&2; exit 1; }
+  (
+    cd "$APP_DIR"
+    bun install
+    bun run build                       # frontend → dist/ (embedded by cargo)
+    cd src-tauri && cargo build --release
+  ) || {
+    echo "mdv: build failed (see output above)." >&2
+    exit 1
+  }
+fi
+
+# Absolutize existing local paths; pass remote specs / deep links through as-is.
+args=()
+for a in "$@"; do
+  if [[ -e "$a" ]]; then
+    args+=("$(cd "$(dirname "$a")" && pwd)/$(basename "$a")")
+  else
+    args+=("$a")
+  fi
+done
+
+# Launch detached so the terminal returns immediately.
+nohup "$BIN" "${args[@]}" >/dev/null 2>&1 &
+disown 2>/dev/null || true
