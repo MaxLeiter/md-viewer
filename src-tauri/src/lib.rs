@@ -106,6 +106,55 @@ async fn read_remote(host: String, path: String) -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
+#[derive(serde::Serialize)]
+struct RemoteEntry {
+    name: String,
+    #[serde(rename = "isDir")]
+    is_dir: bool,
+}
+
+#[derive(serde::Serialize)]
+struct RemoteListing {
+    /// Absolute, resolved directory (`~` expanded by the remote shell).
+    dir: String,
+    entries: Vec<RemoteEntry>,
+}
+
+/// List a remote directory over SSH, for the remote file browser. Prints the
+/// resolved directory, then one entry per line; `ls -p` marks directories with
+/// a trailing `/` and `-L` follows symlinks so linked folders browse as folders.
+#[tauri::command]
+async fn list_remote(host: String, path: String) -> Result<RemoteListing, String> {
+    validate_host(&host)?;
+    tauri::async_runtime::spawn_blocking(move || -> Result<RemoteListing, String> {
+        let q = shell_quote(if path.is_empty() { "~" } else { &path });
+        let output = ssh_base()
+            // `--` ends ssh option parsing; the host can never be read as a flag.
+            .arg("--")
+            .arg(&host)
+            .arg(format!("cd -- {q} && pwd && {{ ls -1ApL 2>/dev/null || true; }}"))
+            .output()
+            .map_err(|e| format!("Could not run ssh: {e}"))?;
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("Could not list {host}:{path}\n{}", err.trim()));
+        }
+        let text = String::from_utf8_lossy(&output.stdout);
+        let mut lines = text.lines();
+        let dir = lines.next().unwrap_or("/").to_string();
+        let entries = lines
+            .filter(|l| !l.is_empty())
+            .map(|l| match l.strip_suffix('/') {
+                Some(name) => RemoteEntry { name: name.to_string(), is_dir: true },
+                None => RemoteEntry { name: l.to_string(), is_dir: false },
+            })
+            .collect();
+        Ok(RemoteListing { dir, entries })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Write a file to a remote host over SSH, atomically (temp file + mv).
 #[tauri::command]
 async fn write_remote(host: String, path: String, contents: String) -> Result<(), String> {
@@ -388,6 +437,11 @@ fn build_menu(app: &AppHandle) -> tauri::Result<()> {
         )
         .item(
             &MenuItemBuilder::with_id("save-as", "Save As…")
+                .accelerator("Alt+CmdOrCtrl+S")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("save-remote", "Save to Remote…")
                 .accelerator("Shift+CmdOrCtrl+S")
                 .build(app)?,
         )
@@ -398,7 +452,12 @@ fn build_menu(app: &AppHandle) -> tauri::Result<()> {
         )
         .separator()
         .item(
-            &MenuItemBuilder::with_id("close-pane", "Close Pane")
+            &MenuItemBuilder::with_id("reload", "Reload")
+                .accelerator("CmdOrCtrl+R")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("close-pane", "Close Tab")
                 .accelerator("CmdOrCtrl+W")
                 .build(app)?,
         )
@@ -413,11 +472,23 @@ fn build_menu(app: &AppHandle) -> tauri::Result<()> {
         .paste()
         .item(
             &MenuItemBuilder::with_id("paste-plain", "Paste and Match Style")
-                .accelerator("Shift+CmdOrCtrl+V")
+                .accelerator("Shift+Alt+CmdOrCtrl+V")
                 .build(app)?,
         )
-        .select_all()
+        // Custom (not the predefined item): the native selectAll does nothing when
+        // no text field has focus — e.g. in preview mode. The frontend picks the
+        // right target (input, editor, or rendered preview).
+        .item(
+            &MenuItemBuilder::with_id("select-all", "Select All")
+                .accelerator("CmdOrCtrl+A")
+                .build(app)?,
+        )
         .separator()
+        .item(
+            &MenuItemBuilder::with_id("copy-path", "Copy Path")
+                .accelerator("CmdOrCtrl+Alt+C")
+                .build(app)?,
+        )
         .item(
             &MenuItemBuilder::with_id("format", "Format Document")
                 .accelerator("Shift+Alt+F")
@@ -428,45 +499,28 @@ fn build_menu(app: &AppHandle) -> tauri::Result<()> {
     let view_menu = SubmenuBuilder::new(app, "View")
         .item(
             &MenuItemBuilder::with_id("mode-editor", "Editor Only")
-                .accelerator("CmdOrCtrl+1")
+                .accelerator("CmdOrCtrl+Alt+1")
                 .build(app)?,
         )
         .item(
             &MenuItemBuilder::with_id("mode-split", "Editor & Preview")
-                .accelerator("CmdOrCtrl+2")
+                .accelerator("CmdOrCtrl+Alt+2")
                 .build(app)?,
         )
         .item(
             &MenuItemBuilder::with_id("mode-preview", "Preview Only")
-                .accelerator("CmdOrCtrl+3")
+                .accelerator("CmdOrCtrl+Alt+3")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("toggle-preview", "Toggle Editor / Preview")
+                .accelerator("Shift+CmdOrCtrl+V")
                 .build(app)?,
         )
         .separator()
         .item(
             &MenuItemBuilder::with_id("toggle-outline", "Toggle Outline")
                 .accelerator("Ctrl+CmdOrCtrl+O")
-                .build(app)?,
-        )
-        .separator()
-        .item(
-            &MenuItemBuilder::with_id("split-right", "Split Right")
-                .accelerator("CmdOrCtrl+D")
-                .build(app)?,
-        )
-        .item(
-            &MenuItemBuilder::with_id("split-down", "Split Down")
-                .accelerator("Shift+CmdOrCtrl+D")
-                .build(app)?,
-        )
-        .separator()
-        .item(
-            &MenuItemBuilder::with_id("focus-next", "Focus Next Pane")
-                .accelerator("Ctrl+Tab")
-                .build(app)?,
-        )
-        .item(
-            &MenuItemBuilder::with_id("focus-prev", "Focus Previous Pane")
-                .accelerator("Ctrl+Shift+Tab")
                 .build(app)?,
         )
         .separator()
@@ -487,6 +541,76 @@ fn build_menu(app: &AppHandle) -> tauri::Result<()> {
         )
         .build()?;
 
+    // Browser-style tab navigation.
+    let tabs_menu = SubmenuBuilder::new(app, "Tabs")
+        .item(
+            &MenuItemBuilder::with_id("focus-next", "Next Tab")
+                .accelerator("Ctrl+Tab")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("focus-prev", "Previous Tab")
+                .accelerator("Ctrl+Shift+Tab")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-next", "Select Next Tab")
+                .accelerator("Shift+CmdOrCtrl+]")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-prev", "Select Previous Tab")
+                .accelerator("Shift+CmdOrCtrl+[")
+                .build(app)?,
+        )
+        .separator()
+        .item(
+            &MenuItemBuilder::with_id("tab-1", "Tab 1")
+                .accelerator("CmdOrCtrl+1")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-2", "Tab 2")
+                .accelerator("CmdOrCtrl+2")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-3", "Tab 3")
+                .accelerator("CmdOrCtrl+3")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-4", "Tab 4")
+                .accelerator("CmdOrCtrl+4")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-5", "Tab 5")
+                .accelerator("CmdOrCtrl+5")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-6", "Tab 6")
+                .accelerator("CmdOrCtrl+6")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-7", "Tab 7")
+                .accelerator("CmdOrCtrl+7")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-8", "Tab 8")
+                .accelerator("CmdOrCtrl+8")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("tab-9", "Tab 9")
+                .accelerator("CmdOrCtrl+9")
+                .build(app)?,
+        )
+        .build()?;
+
     let window_menu = SubmenuBuilder::new(app, "Window")
         .minimize()
         .item(&PredefinedMenuItem::maximize(app, Some("Zoom"))?)
@@ -495,7 +619,14 @@ fn build_menu(app: &AppHandle) -> tauri::Result<()> {
         .build()?;
 
     let menu = MenuBuilder::new(app)
-        .items(&[&app_menu, &file_menu, &edit_menu, &view_menu, &window_menu])
+        .items(&[
+            &app_menu,
+            &file_menu,
+            &edit_menu,
+            &view_menu,
+            &tabs_menu,
+            &window_menu,
+        ])
         .build()?;
     app.set_menu(menu)?;
     Ok(())
@@ -530,6 +661,7 @@ pub fn run() {
             read_file,
             write_file,
             read_remote,
+            list_remote,
             write_remote,
             allow_asset,
             path_exists,

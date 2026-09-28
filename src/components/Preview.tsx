@@ -4,7 +4,6 @@ import { renderBlocks, subscribeRerender } from "../markdown";
 import { renderCsvBlocks } from "../csv";
 import { classifyPath, isCsvPath } from "../types";
 import { useStore } from "../store";
-import { leaves } from "../tree";
 import { applyAnnotations, keyForDoc, subscribeAnnotations } from "../annotations";
 
 interface BlockRecord {
@@ -99,9 +98,9 @@ function createPreviewController(container: HTMLElement, docId: string): () => v
     return local ? local.slice(0, local.lastIndexOf("/")) : null;
   };
   const visible = () => {
-    const state = useStore.getState();
-    const leaf = leaves(state.root).find((l) => l.docId === docId);
-    return !leaf || leaf.mode !== "editor";
+    // The preview only renders for the active doc; hidden only in editor-only mode.
+    const mode = useStore.getState().views[docId]?.mode;
+    return mode !== "editor";
   };
 
   const cancel = () => {

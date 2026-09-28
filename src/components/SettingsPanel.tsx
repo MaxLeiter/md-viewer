@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   applySettings,
   captureKeybind,
@@ -51,20 +51,27 @@ function KeybindRow({
   const current = keybindFor(settings, def.id);
   const customized = current !== def.defaultKey;
 
-  const handleKeyDown = (event: React.KeyboardEvent) => {
+  // Capture on window (capture phase) while recording. Relying on the button's
+  // own onKeyDown fails on macOS WebKit, where clicking a <button> does not give
+  // it keyboard focus — so keydowns never reached it and recording got stuck.
+  useEffect(() => {
     if (!recording) return;
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.key === "Escape") {
+    const onKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Escape") {
+        onRecord(null);
+        applySettings(useSettings.getState().settings); // restore menu accelerators
+        return;
+      }
+      const captured = captureKeybind(event, def.kind);
+      if (!captured) return; // modifier-only press: keep waiting
+      setKeybind(def.id, captured);
       onRecord(null);
-      applySettings(useSettings.getState().settings); // restore menu accelerators
-      return;
-    }
-    const captured = captureKeybind(event.nativeEvent, def.kind);
-    if (!captured) return;
-    setKeybind(def.id, captured);
-    onRecord(null);
-  };
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [recording, def.id, def.kind, onRecord, setKeybind]);
 
   return (
     <div className="settings-keybind-row">
@@ -75,13 +82,6 @@ function KeybindRow({
           if (recording) return;
           suspendMenuAccelerators();
           onRecord(def.id);
-        }}
-        onKeyDown={handleKeyDown}
-        onBlur={() => {
-          if (recording) {
-            onRecord(null);
-            applySettings(useSettings.getState().settings);
-          }
         }}
       >
         {recording ? "Press keys…" : formatKeybind(current)}
@@ -218,6 +218,21 @@ export function SettingsPanel() {
             <p className="settings-note">
               Used when an <code>mdviewer://</code> link or <code>mdv</code> command omits a
               host. Files open over your system SSH (honors <code>~/.ssh/config</code>).
+            </p>
+            <div className="settings-row">
+              <span>Copy path includes host</span>
+              <Segmented<"on" | "off">
+                value={settings.copyPathWithHost ? "on" : "off"}
+                options={[
+                  { value: "on", label: "On" },
+                  { value: "off", label: "Off" },
+                ]}
+                onChange={(value) => update({ copyPathWithHost: value === "on" })}
+              />
+            </div>
+            <p className="settings-note">
+              Copy Path (<code>⌘⌥C</code>) copies the bare path by default; turn this on to
+              prefix remote paths with <code>host:</code>.
             </p>
           </section>
 

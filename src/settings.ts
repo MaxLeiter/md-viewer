@@ -19,6 +19,8 @@ export interface Settings {
   defaultMode: ViewMode;
   /** Reformat markdown with Prettier on every save. */
   formatOnSave: boolean;
+  /** Copy Path (⌘⌥C) prefixes remote paths with `host:` when true. */
+  copyPathWithHost: boolean;
   /** SSH host used when an mdviewer:// link or `mdv` command omits one. */
   defaultRemoteHost: string;
   /** Keybind overrides by action id (CodeMirror syntax for editor actions, menu syntax for menu actions). */
@@ -42,21 +44,25 @@ export const KEYBINDS: KeybindDef[] = [
   { id: "new", label: "New file", kind: "menu", defaultKey: "CmdOrCtrl+N" },
   { id: "open", label: "Open…", kind: "menu", defaultKey: "CmdOrCtrl+O" },
   { id: "save", label: "Save", kind: "menu", defaultKey: "CmdOrCtrl+S" },
-  { id: "save-as", label: "Save as…", kind: "menu", defaultKey: "Shift+CmdOrCtrl+S" },
+  { id: "save-as", label: "Save as…", kind: "menu", defaultKey: "Alt+CmdOrCtrl+S" },
+  { id: "save-remote", label: "Save to remote…", kind: "menu", defaultKey: "Shift+CmdOrCtrl+S" },
   { id: "export-html", label: "Export as HTML…", kind: "menu", defaultKey: "Shift+CmdOrCtrl+E" },
-  { id: "close-pane", label: "Close pane", kind: "menu", defaultKey: "CmdOrCtrl+W" },
-  { id: "mode-editor", label: "Editor only", kind: "menu", defaultKey: "CmdOrCtrl+1" },
-  { id: "mode-split", label: "Editor & preview", kind: "menu", defaultKey: "CmdOrCtrl+2" },
-  { id: "mode-preview", label: "Preview only", kind: "menu", defaultKey: "CmdOrCtrl+3" },
+  { id: "reload", label: "Reload", kind: "menu", defaultKey: "CmdOrCtrl+R" },
+  { id: "copy-path", label: "Copy path", kind: "menu", defaultKey: "CmdOrCtrl+Alt+C" },
+  { id: "close-pane", label: "Close tab", kind: "menu", defaultKey: "CmdOrCtrl+W" },
+  { id: "mode-editor", label: "Editor only", kind: "menu", defaultKey: "CmdOrCtrl+Alt+1" },
+  { id: "mode-split", label: "Editor & preview", kind: "menu", defaultKey: "CmdOrCtrl+Alt+2" },
+  { id: "mode-preview", label: "Preview only", kind: "menu", defaultKey: "CmdOrCtrl+Alt+3" },
+  { id: "toggle-preview", label: "Toggle editor / preview", kind: "menu", defaultKey: "Shift+CmdOrCtrl+V" },
   { id: "toggle-outline", label: "Toggle outline", kind: "menu", defaultKey: "Ctrl+CmdOrCtrl+O" },
-  { id: "split-right", label: "New pane right", kind: "menu", defaultKey: "CmdOrCtrl+D" },
-  { id: "split-down", label: "New pane below", kind: "menu", defaultKey: "Shift+CmdOrCtrl+D" },
-  { id: "focus-next", label: "Focus next pane", kind: "menu", defaultKey: "Ctrl+Tab" },
-  { id: "focus-prev", label: "Focus previous pane", kind: "menu", defaultKey: "Ctrl+Shift+Tab" },
+  { id: "focus-next", label: "Next tab", kind: "menu", defaultKey: "Ctrl+Tab" },
+  { id: "focus-prev", label: "Previous tab", kind: "menu", defaultKey: "Ctrl+Shift+Tab" },
+  { id: "tab-next", label: "Next tab (⌘⇧])", kind: "menu", defaultKey: "Shift+CmdOrCtrl+]" },
+  { id: "tab-prev", label: "Previous tab (⌘⇧[)", kind: "menu", defaultKey: "Shift+CmdOrCtrl+[" },
   { id: "zoom-in", label: "Zoom in", kind: "menu", defaultKey: "CmdOrCtrl+=" },
   { id: "zoom-out", label: "Zoom out", kind: "menu", defaultKey: "CmdOrCtrl+-" },
   { id: "zoom-reset", label: "Actual size", kind: "menu", defaultKey: "CmdOrCtrl+0" },
-  { id: "paste-plain", label: "Paste and match style", kind: "menu", defaultKey: "Shift+CmdOrCtrl+V" },
+  { id: "paste-plain", label: "Paste and match style", kind: "menu", defaultKey: "Shift+Alt+CmdOrCtrl+V" },
   { id: "format", label: "Format document", kind: "menu", defaultKey: "Shift+Alt+F" },
 ];
 
@@ -66,6 +72,7 @@ const DEFAULTS: Settings = {
   caretAnimation: true,
   defaultMode: "split",
   formatOnSave: false,
+  copyPathWithHost: false,
   defaultRemoteHost: "",
   keybinds: {},
 };
@@ -89,9 +96,9 @@ export function keybindFor(settings: Settings, id: string): string {
 }
 
 const WIDTHS: Record<WidthSetting, string> = {
-  narrow: "38rem",
-  normal: "44rem",
-  wide: "56rem",
+  narrow: "57rem",
+  normal: "66rem",
+  wide: "84rem",
   full: "9999px",
 };
 

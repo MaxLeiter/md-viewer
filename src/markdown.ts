@@ -283,9 +283,11 @@ export function renderBlocks(source: string, baseDir: string | null = null): str
   let body = source;
   let frontmatterHtml: string | null = null;
   const frontmatter = FRONTMATTER_RE.exec(source);
+  let frontmatterLines = 0;
   if (frontmatter) {
     frontmatterHtml = sanitize(renderFrontmatter(frontmatter[1]));
     body = source.slice(frontmatter[0].length);
+    frontmatterLines = frontmatter[0].match(/\n/g)?.length ?? 0;
   }
 
   const env: { references?: Record<string, unknown>; baseDir?: string | null } = { baseDir };
@@ -305,9 +307,14 @@ export function renderBlocks(source: string, baseDir: string | null = null): str
 
   const nextCache = new Map<string, string>();
   const htmls: string[] = [];
+  // Editor line (1-based) where each block starts, carried forward for the rare
+  // block that has no source map. Stamped onto the HTML so the preview DOM can
+  // be scroll-synced to the editor by line (see Tile's view-toggle handler).
+  let blockLine = frontmatterLines + 1;
 
   for (const group of groups) {
     const first = group[0];
+    if (first.map) blockLine = frontmatterLines + first.map[0] + 1;
     let key: string;
     if (first.map) {
       let endLine = first.map[1];
@@ -330,11 +337,18 @@ export function renderBlocks(source: string, baseDir: string | null = null): str
       html = sanitize(md.renderer.render(group, md.options, env));
     }
     nextCache.set(key, html);
-    htmls.push(html);
+    // Inject the source line AFTER caching so the cache stays line-agnostic
+    // (identical block text reused at a different line stays a cache hit).
+    htmls.push(injectSourceLine(html, blockLine));
   }
 
   blockCache = nextCache;
-  return frontmatterHtml ? [frontmatterHtml, ...htmls] : htmls;
+  return frontmatterHtml ? [injectSourceLine(frontmatterHtml, 1), ...htmls] : htmls;
+}
+
+/** Stamp data-source-line onto a block's first element tag. */
+function injectSourceLine(html: string, line: number): string {
+  return html.replace(/^(\s*)<([a-zA-Z][\w-]*)/, `$1<$2 data-source-line="${line}"`);
 }
 
 /**

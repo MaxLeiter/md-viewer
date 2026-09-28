@@ -1,18 +1,20 @@
 import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useStore } from "./store";
-import { findLeaf } from "./tree";
 
 /**
- * Native right-click menu for a tile. Built fresh each time so it reflects
- * the current document (e.g. "Reveal in Finder" only when saved to disk).
+ * Native right-click menu for a tab/document. Built fresh each time so it
+ * reflects the current document (e.g. "Reveal in Finder" only when saved to
+ * disk). `docId` is the document the menu acts on (the active doc's id).
  */
-export async function showTileContextMenu(leafId: string): Promise<void> {
+export async function showTileContextMenu(docId: string): Promise<void> {
   const state = useStore.getState();
-  const leaf = findLeaf(state.root, leafId);
-  if (!leaf) return;
-  const path = state.docs[leaf.docId]?.path ?? null;
-  state.focusLeaf(leafId);
+  const doc = state.docs[docId];
+  if (!doc) return;
+  const path = doc.path ?? null;
+  // Reload/Copy Path need a backing file (local path or remote SSH ref).
+  const hasFile = !!(doc.path || doc.remote);
+  state.selectTab(docId);
 
   const separator = () => PredefinedMenuItem.new({ item: "Separator" });
   const item = (text: string, action: () => void) => MenuItem.new({ text, action });
@@ -20,13 +22,16 @@ export async function showTileContextMenu(leafId: string): Promise<void> {
   const items = await Promise.all([
     item("New File", () => useStore.getState().newDoc()),
     item("Open…", () => void useStore.getState().openViaDialog()),
-    separator(),
-    item("New Pane Right", () => useStore.getState().splitFocused("row")),
-    item("New Pane Left", () => useStore.getState().splitFocused("row", true)),
-    item("New Pane Below", () => useStore.getState().splitFocused("col")),
+    ...(hasFile
+      ? [
+          separator(),
+          item("Reload", () => void useStore.getState().reloadDoc(docId)),
+          item("Copy Path", () => void useStore.getState().copyDocPath(docId)),
+        ]
+      : []),
     separator(),
     ...(path ? [item("Reveal in Finder", () => void revealItemInDir(path))] : []),
-    item("Close Pane", () => void useStore.getState().closeLeaf(leafId)),
+    item("Close Tab", () => void useStore.getState().closeTab(docId)),
   ]);
 
   const menu = await Menu.new({ items });

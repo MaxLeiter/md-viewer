@@ -5,7 +5,6 @@ import { editorExtensions } from "../editor/extensions";
 import { registerEditorView, unregisterEditorView } from "../editor/registry";
 import { useSettings } from "../settings";
 import { useStore } from "../store";
-import { leaves } from "../tree";
 import type { Doc } from "../types";
 
 export function Editor({ doc }: { doc: Doc }) {
@@ -46,10 +45,9 @@ export function Editor({ doc }: { doc: Doc }) {
       });
       registerEditorView(doc.id, view);
 
-      // If this editor belongs to the focused tile, take keyboard focus.
+      // If this editor is the active document (and not preview-only), take focus.
       const state = useStore.getState();
-      const leaf = leaves(state.root).find((l) => l.docId === doc.id);
-      if (leaf && leaf.id === state.focusedId && leaf.mode !== "preview") {
+      if (state.activeId === doc.id && state.views[doc.id]?.mode !== "preview") {
         view.focus();
       }
 

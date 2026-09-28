@@ -1,16 +1,16 @@
 import { useCallback, useState } from "react";
 import { useStore } from "../store";
 import { useSettings } from "../settings";
-import { findLeaf } from "../tree";
 import { displayTitle, isDirty } from "../types";
 import type { ViewMode } from "../types";
 import { getEditorView } from "../editor/registry";
 import { insertTable } from "../editor/commands";
+import { showTileContextMenu } from "../contextMenu";
 
 const MODES: { mode: ViewMode; label: string; shortcut: string }[] = [
-  { mode: "editor", label: "Editor only", shortcut: "⌘1" },
-  { mode: "split", label: "Editor & preview", shortcut: "⌘2" },
-  { mode: "preview", label: "Preview only", shortcut: "⌘3" },
+  { mode: "editor", label: "Editor only", shortcut: "⌘⌥1" },
+  { mode: "split", label: "Editor & preview", shortcut: "⌘⌥2" },
+  { mode: "preview", label: "Preview only", shortcut: "⌘⌥3" },
 ];
 
 function ModeIcon({ mode }: { mode: ViewMode }) {
@@ -55,6 +55,24 @@ function TableIcon() {
       <line x1="0.5" y1="4.5" x2="14.5" y2="4.5" stroke="currentColor" strokeWidth="1.2" />
       <line x1="5.5" y1="4.5" x2="5.5" y2="12.5" stroke="currentColor" strokeWidth="1" />
       <line x1="10" y1="4.5" x2="10" y2="12.5" stroke="currentColor" strokeWidth="1" />
+    </svg>
+  );
+}
+
+function SidebarIcon() {
+  return (
+    <svg width="15" height="14" viewBox="0 0 16 16" aria-hidden="true">
+      <rect
+        x="1.5"
+        y="2.5"
+        width="13"
+        height="11"
+        rx="2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+      <line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" strokeWidth="1.3" />
     </svg>
   );
 }
@@ -151,27 +169,42 @@ function TableButton({ docId, leafId, mode }: { docId: string; leafId: string; m
 }
 
 export function TitleBar() {
-  const leaf = useStore((s) => findLeaf(s.root, s.focusedId));
-  const doc = useStore((s) => {
-    const l = findLeaf(s.root, s.focusedId);
-    return l ? (s.docs[l.docId] ?? null) : null;
-  });
+  const activeId = useStore((s) => s.activeId);
+  const doc = useStore((s) => s.docs[s.activeId] ?? null);
+  const mode = useStore((s) => s.views[s.activeId]?.mode ?? "split");
+  const outline = useStore((s) => s.views[s.activeId]?.outline ?? false);
+  const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setMode = useStore((s) => s.setMode);
 
   const dirty = doc ? isDirty(doc) : false;
 
   return (
-    <header className="titlebar" data-tauri-drag-region>
+    <header
+      className="titlebar"
+      data-tauri-drag-region
+      onContextMenu={(event) => {
+        event.preventDefault();
+        void showTileContextMenu(activeId);
+      }}
+    >
       <div className="titlebar-title">
+        {doc?.remote && <span className="titlebar-host">{doc.remote.host}:</span>}
         <span className="titlebar-name">{doc ? displayTitle(doc) : ""}</span>
         {dirty && <span className="dirty-dot" />}
       </div>
-      {leaf && doc && (
+      {doc && (
         <div className="titlebar-actions">
           <button
-            className={`titlebar-btn${leaf.outline ? " active" : ""}`}
+            className={`titlebar-btn${sidebarOpen ? " active" : ""}`}
+            data-tip="Toggle sidebar"
+            onClick={() => useStore.getState().toggleSidebar()}
+          >
+            <SidebarIcon />
+          </button>
+          <button
+            className={`titlebar-btn${outline ? " active" : ""}`}
             data-tip="Outline · ⌃⌘O"
-            onClick={() => useStore.getState().toggleOutline(leaf.id)}
+            onClick={() => useStore.getState().toggleOutline(activeId)}
           >
             <OutlineIcon />
           </button>
@@ -182,16 +215,16 @@ export function TitleBar() {
           >
             <GearIcon />
           </button>
-          <TableButton docId={doc.id} leafId={leaf.id} mode={leaf.mode} />
+          <TableButton docId={doc.id} leafId={activeId} mode={mode} />
           <div className="mode-switch">
-            {MODES.map(({ mode, label, shortcut }) => (
+            {MODES.map(({ mode: m, label, shortcut }) => (
               <button
-                key={mode}
-                className={leaf.mode === mode ? "active" : ""}
+                key={m}
+                className={mode === m ? "active" : ""}
                 data-tip={`${label} · ${shortcut}`}
-                onClick={() => setMode(leaf.id, mode)}
+                onClick={() => setMode(activeId, m)}
               >
-                <ModeIcon mode={mode} />
+                <ModeIcon mode={m} />
               </button>
             ))}
           </div>

@@ -8,7 +8,6 @@ import { applySettings, useSettings } from "./settings";
 import { clearRecents, initRecents } from "./recent";
 import { formatDocument } from "./format";
 import { useStore } from "./store";
-import { findLeaf, leaves } from "./tree";
 import { displayTitle } from "./types";
 import { getEditorView } from "./editor/registry";
 
@@ -27,18 +26,17 @@ function markdownImageSnippet(path: string, docDir: string | null): string {
  *  native dragover events during an OS file drag, so CodeMirror's own drop
  *  cursor never sees them — we drive the caret ourselves. */
 function editorAtPoint(point: { x: number; y: number }): EditorView | null {
-  for (const leaf of leaves(useStore.getState().root)) {
-    const view = getEditorView(leaf.docId);
-    if (!view) continue;
-    const rect = view.dom.getBoundingClientRect();
-    if (
-      point.x >= rect.left &&
-      point.x <= rect.right &&
-      point.y >= rect.top &&
-      point.y <= rect.bottom
-    ) {
-      return view;
-    }
+  // Only the active document is visible, so there's a single editor to consider.
+  const view = getEditorView(useStore.getState().activeId);
+  if (!view) return null;
+  const rect = view.dom.getBoundingClientRect();
+  if (
+    point.x >= rect.left &&
+    point.x <= rect.right &&
+    point.y >= rect.top &&
+    point.y <= rect.bottom
+  ) {
+    return view;
   }
   return null;
 }
@@ -60,35 +58,12 @@ function trackDragCursor(point: { x: number; y: number } | null) {
 function insertDroppedImages(paths: string[], point: { x: number; y: number } | null) {
   const s = useStore.getState();
 
-  let view: EditorView | null = null;
-  let leafId: string | null = null;
-  if (point) {
-    for (const leaf of leaves(s.root)) {
-      const candidate = getEditorView(leaf.docId);
-      if (!candidate) continue;
-      const rect = candidate.dom.getBoundingClientRect();
-      if (
-        point.x >= rect.left &&
-        point.x <= rect.right &&
-        point.y >= rect.top &&
-        point.y <= rect.bottom
-      ) {
-        view = candidate;
-        leafId = leaf.id;
-        break;
-      }
-    }
-  }
-  const focused = s.focusedLeaf();
-  if (!view && focused) {
-    view = getEditorView(focused.docId) ?? null;
-    leafId = focused.id;
-  }
-  if (!view || !leafId) return;
-  const leaf = findLeaf(s.root, leafId);
-  if (!leaf) return;
+  // Images always land in the active document's editor (the only visible one).
+  const docId = s.activeId;
+  const view = getEditorView(docId);
+  if (!view) return;
 
-  const docPath = s.docs[leaf.docId]?.path ?? null;
+  const docPath = s.docs[docId]?.path ?? null;
   const docDir = docPath ? docPath.slice(0, docPath.lastIndexOf("/")) : null;
   const snippet = paths.map((p) => markdownImageSnippet(p, docDir)).join("\n");
 
@@ -106,9 +81,37 @@ function insertDroppedImages(paths: string[], point: { x: number; y: number } | 
     scrollIntoView: true,
     userEvent: "input",
   });
-  s.focusLeaf(leafId);
-  if (leaf.mode === "preview") s.setMode(leaf.id, "split");
+  if (s.views[docId]?.mode === "preview") s.setMode(docId, "split");
   view.focus();
+}
+
+/**
+ * ⌘A. Replaces the native Select All, which does nothing unless a text field
+ * has focus (e.g. in preview mode). Picks the target the user means: a focused
+ * input, else the editor when it's focused or the only pane, else the preview.
+ */
+function selectAll() {
+  const focused = document.activeElement;
+  if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) {
+    focused.select();
+    return;
+  }
+  const s = useStore.getState();
+  const mode = s.views[s.activeId]?.mode;
+  const view = getEditorView(s.activeId);
+  if (view && (view.hasFocus || mode === "editor")) {
+    view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
+    view.focus();
+    return;
+  }
+  const preview = document.querySelector<HTMLElement>(".tile .preview");
+  if (preview && mode !== "editor") {
+    const range = document.createRange();
+    range.selectNodeContents(preview);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
 }
 
 declare global {
@@ -124,6 +127,11 @@ function handleMenu(id: string) {
     void s.openPaths([id.slice("recent:".length)]);
     return;
   }
+  // ⌘1…⌘9 jump straight to a tab by index.
+  if (/^tab-[1-9]$/.test(id)) {
+    s.jumpToTab(Number(id.slice("tab-".length)) - 1);
+    return;
+  }
   switch (id) {
     case "new":
       s.newDoc();
@@ -132,7 +140,13 @@ function handleMenu(id: string) {
       void s.openViaDialog();
       break;
     case "open-remote":
-      s.setRemotePrompt(true);
+      s.setRemoteBrowser("open");
+      break;
+    case "save-remote":
+      s.setRemoteBrowser("save");
+      break;
+    case "select-all":
+      selectAll();
       break;
     case "clear-recent":
       clearRecents();
@@ -158,19 +172,25 @@ function handleMenu(id: string) {
       break;
     }
     case "close-pane":
-      void s.closeLeaf();
+      void s.closeTab();
       break;
     case "mode-editor":
     case "mode-split":
-    case "mode-preview": {
-      const leaf = s.focusedLeaf();
-      if (leaf) s.setMode(leaf.id, id.replace("mode-", "") as "editor" | "split" | "preview");
+    case "mode-preview":
+      s.setMode(s.activeId, id.replace("mode-", "") as "editor" | "split" | "preview");
       break;
-    }
+    case "toggle-preview":
+      s.togglePreview();
+      break;
+    case "reload":
+      void s.reloadDoc(s.activeId);
+      break;
+    case "copy-path":
+      void s.copyDocPath(s.activeId);
+      break;
     case "paste-plain": {
       // ⌘V in the editor is already plain text; this covers the ⇧⌘V muscle memory.
-      const leaf = s.focusedLeaf();
-      const view = leaf ? getEditorView(leaf.docId) : undefined;
+      const view = getEditorView(s.activeId);
       if (!view) break;
       void readText().then((text) => {
         if (!text) return;
@@ -182,22 +202,16 @@ function handleMenu(id: string) {
       });
       break;
     }
-    case "toggle-outline": {
-      const leaf = s.focusedLeaf();
-      if (leaf) s.toggleOutline(leaf.id);
-      break;
-    }
-    case "split-right":
-      s.splitFocused("row");
-      break;
-    case "split-down":
-      s.splitFocused("col");
+    case "toggle-outline":
+      s.toggleOutline(s.activeId);
       break;
     case "focus-next":
-      s.focusNext();
+    case "tab-next":
+      s.nextTab();
       break;
     case "focus-prev":
-      s.focusPrevious();
+    case "tab-prev":
+      s.prevTab();
       break;
     case "zoom-in":
       s.setZoom(s.zoom + 0.1);
@@ -286,12 +300,11 @@ export function initApp(): void {
     initRecents();
   });
 
-  // Native window title follows the focused document.
+  // Native window title follows the active document.
   let lastTitle = "";
   const syncTitle = () => {
     const state = useStore.getState();
-    const leaf = findLeaf(state.root, state.focusedId);
-    const doc = leaf ? state.docs[leaf.docId] : null;
+    const doc = state.docs[state.activeId] ?? null;
     const docTitle = doc ? displayTitle(doc) : null;
     const title = docTitle && docTitle !== "Untitled" ? docTitle : "Markdown";
     if (title !== lastTitle) {
@@ -302,16 +315,15 @@ export function initApp(): void {
   useStore.subscribe(syncTitle);
   syncTitle();
 
-  // Keyboard focus follows the focused tile.
-  let lastFocusedId = useStore.getState().focusedId;
+  // Keyboard focus follows the active tab.
+  let lastActiveId = useStore.getState().activeId;
   useStore.subscribe((state) => {
-    if (state.focusedId === lastFocusedId) return;
-    lastFocusedId = state.focusedId;
-    const leaf = findLeaf(state.root, state.focusedId);
-    if (!leaf || leaf.mode === "preview") return;
-    // A freshly created tile's editor mounts on the next React commit.
+    if (state.activeId === lastActiveId) return;
+    lastActiveId = state.activeId;
+    if (state.views[state.activeId]?.mode === "preview") return;
+    // A freshly activated tab's editor mounts on the next React commit.
     requestAnimationFrame(() => {
-      getEditorView(leaf.docId)?.focus();
+      getEditorView(state.activeId)?.focus();
     });
   });
 }

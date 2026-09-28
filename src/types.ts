@@ -29,6 +29,15 @@ export interface LeafNode {
   outline?: boolean;
 }
 
+/** Per-tab view state: how one document is currently displayed. */
+export interface TabView {
+  mode: ViewMode;
+  /** Editor's share of the tile when mode === "split" (0..1). */
+  ratio: number;
+  /** Whether the document-outline sidebar is shown. */
+  outline: boolean;
+}
+
 export interface SplitNode {
   type: "split";
   id: string;

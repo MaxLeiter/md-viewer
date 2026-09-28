@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   open as openDialog,
   save as saveDialog,
@@ -41,6 +42,17 @@ export function readRemoteFile(host: string, path: string): Promise<string> {
   return invoke<string>("read_remote", { host, path });
 }
 
+export interface RemoteListing {
+  /** Resolved absolute directory. */
+  dir: string;
+  entries: { name: string; isDir: boolean }[];
+}
+
+/** List a remote directory over SSH (for the remote file browser). */
+export function listRemoteDir(host: string, path: string): Promise<RemoteListing> {
+  return invoke<RemoteListing>("list_remote", { host, path });
+}
+
 /** Write a remote file over SSH (atomic on the remote side). */
 export function writeRemoteFile(host: string, path: string, contents: string): Promise<void> {
   return invoke<void>("write_remote", { host, path, contents });
@@ -74,6 +86,31 @@ export async function pickSavePath(suggestedName: string): Promise<string | null
     filters: MARKDOWN_FILTER,
   });
   return result ?? null;
+}
+
+/** Copy text to the system clipboard. */
+export function copyToClipboard(text: string): Promise<void> {
+  return writeText(text);
+}
+
+/** Confirm discarding unsaved edits before reloading from disk/remote. */
+export function confirmReloadDiscard(title: string): Promise<boolean> {
+  return confirm(`Reloading will discard the unsaved changes you made to “${title}”. Reload anyway?`, {
+    title: "Unsaved Changes",
+    kind: "warning",
+    okLabel: "Reload",
+    cancelLabel: "Cancel",
+  });
+}
+
+/** Confirm replacing an existing file (remote save). */
+export function confirmOverwrite(name: string): Promise<boolean> {
+  return confirm(`“${name}” already exists. Do you want to replace it?`, {
+    title: "Replace File",
+    kind: "warning",
+    okLabel: "Replace",
+    cancelLabel: "Cancel",
+  });
 }
 
 /** "Save before closing?" — true means save, false means discard. */
