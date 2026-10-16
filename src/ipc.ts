@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   open as openDialog,
   save as saveDialog,
@@ -74,6 +75,21 @@ export async function pickSavePath(suggestedName: string): Promise<string | null
     filters: MARKDOWN_FILTER,
   });
   return result ?? null;
+}
+
+/** Copy text to the system clipboard. */
+export function copyToClipboard(text: string): Promise<void> {
+  return writeText(text);
+}
+
+/** Confirm discarding unsaved edits before reloading from disk/remote. */
+export function confirmReloadDiscard(title: string): Promise<boolean> {
+  return confirm(`Reloading will discard the unsaved changes you made to “${title}”. Reload anyway?`, {
+    title: "Unsaved Changes",
+    kind: "warning",
+    okLabel: "Reload",
+    cancelLabel: "Cancel",
+  });
 }
 
 /** "Save before closing?" — true means save, false means discard. */

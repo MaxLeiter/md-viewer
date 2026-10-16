@@ -6,6 +6,7 @@ import { displayTitle, isDirty } from "../types";
 import type { ViewMode } from "../types";
 import { getEditorView } from "../editor/registry";
 import { insertTable } from "../editor/commands";
+import { showTileContextMenu } from "../contextMenu";
 
 const MODES: { mode: ViewMode; label: string; shortcut: string }[] = [
   { mode: "editor", label: "Editor only", shortcut: "⌘1" },
@@ -161,7 +162,15 @@ export function TitleBar() {
   const dirty = doc ? isDirty(doc) : false;
 
   return (
-    <header className="titlebar" data-tauri-drag-region>
+    <header
+      className="titlebar"
+      data-tauri-drag-region
+      onContextMenu={(event) => {
+        if (!leaf) return;
+        event.preventDefault();
+        void showTileContextMenu(leaf.id);
+      }}
+    >
       <div className="titlebar-title">
         <span className="titlebar-name">{doc ? displayTitle(doc) : ""}</span>
         {dirty && <span className="dirty-dot" />}

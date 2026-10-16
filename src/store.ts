@@ -14,6 +14,8 @@ import {
 } from "./tree";
 import {
   askToSave,
+  confirmReloadDiscard,
+  copyToClipboard,
   pathExists,
   pickFilesToOpen,
   pickSavePath,
@@ -114,6 +116,8 @@ interface AppState {
   followLink(docId: string, href: string): Promise<void>;
   exportHtml(docId: string): Promise<void>;
   saveDoc(docId: string, saveAs?: boolean): Promise<boolean>;
+  reloadDoc(docId: string): Promise<void>;
+  copyDocPath(docId: string): Promise<void>;
   closeLeaf(leafId?: string): Promise<void>;
 }
 
@@ -485,6 +489,45 @@ export const useStore = create<AppState>()((set, get) => ({
     });
     addRecent(path, basename(path));
     return true;
+  },
+
+  async reloadDoc(docId) {
+    const doc = get().docs[docId];
+    if (!doc) return;
+    // Nothing to reload for an unsaved scratch document.
+    if (!doc.path && !doc.remote) return;
+
+    // The live editor view is the source of truth for dirtiness.
+    const liveView = getEditorView(docId);
+    const liveContent = liveView ? liveView.state.doc.toString() : doc.content;
+    if (liveContent !== doc.saved && !(await confirmReloadDiscard(displayTitle(doc)))) return;
+
+    let content: string;
+    try {
+      content = doc.remote
+        ? await readRemoteFile(doc.remote.host, doc.remote.path)
+        : await readTextFile(doc.path!);
+    } catch (err) {
+      await showError(String(err));
+      return;
+    }
+
+    set((s) => {
+      const current = s.docs[docId];
+      return current ? { docs: { ...s.docs, [docId]: { ...current, content, saved: content } } } : s;
+    });
+    const view = getEditorView(docId);
+    if (view) {
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } });
+    }
+  },
+
+  async copyDocPath(docId) {
+    const doc = get().docs[docId];
+    if (!doc) return;
+    const text = doc.remote ? `${doc.remote.host}:${doc.remote.path}` : doc.path;
+    if (!text) return; // unsaved scratch document has no path
+    await copyToClipboard(text);
   },
 
   async closeLeaf(leafId) {

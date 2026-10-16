@@ -11,7 +11,11 @@ export async function showTileContextMenu(leafId: string): Promise<void> {
   const state = useStore.getState();
   const leaf = findLeaf(state.root, leafId);
   if (!leaf) return;
-  const path = state.docs[leaf.docId]?.path ?? null;
+  const docId = leaf.docId;
+  const doc = state.docs[docId];
+  const path = doc?.path ?? null;
+  // Reload/Copy Path need a backing file (local path or remote SSH ref).
+  const hasFile = !!(doc && (doc.path || doc.remote));
   state.focusLeaf(leafId);
 
   const separator = () => PredefinedMenuItem.new({ item: "Separator" });
@@ -20,6 +24,13 @@ export async function showTileContextMenu(leafId: string): Promise<void> {
   const items = await Promise.all([
     item("New File", () => useStore.getState().newDoc()),
     item("Open…", () => void useStore.getState().openViaDialog()),
+    ...(hasFile
+      ? [
+          separator(),
+          item("Reload", () => void useStore.getState().reloadDoc(docId)),
+          item("Copy Path", () => void useStore.getState().copyDocPath(docId)),
+        ]
+      : []),
     separator(),
     item("New Pane Right", () => useStore.getState().splitFocused("row")),
     item("New Pane Left", () => useStore.getState().splitFocused("row", true)),
