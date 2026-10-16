@@ -70,6 +70,12 @@ mdv coder.box:/home/me/plan.md          # open over SSH
 
 Override the source location with `MDV_DIR`; force a rebuild with `mdv --rebuild`.
 
+## Midnight Commander integration
+
+Browse local and remote trees in Midnight Commander and open Markdown files in
+md-viewer with a keypress (remote files open live over SSH). See
+[docs/midnight-commander-integration.md](docs/midnight-commander-integration.md).
+
 ## Shortcuts
 
 | Action | Keys |
